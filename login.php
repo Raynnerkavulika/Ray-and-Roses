@@ -6,14 +6,10 @@ $error_message = '';
 
 // Check if user is already logged in
 if(isset($_SESSION['user_id'])) {
-    // Check if user is admin, redirect to admin panel
-    if(isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 1) {
-        header("Location: admin/dashboard.php");
-    } else {
-        $redirect_page = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'dashboard.php';
-        unset($_SESSION['redirect_after_login']);
-        header("Location: $redirect_page");
-    }
+    // Redirect regular users to dashboard
+    $redirect_page = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'dashboard.php';
+    unset($_SESSION['redirect_after_login']);
+    header("Location: $redirect_page");
     exit();
 }
 
@@ -29,7 +25,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "Please enter a valid email address";
     } else {
         // Check if user exists
-        $sql = "SELECT id, first_name, last_name, email, password, is_admin, role FROM users WHERE email = ?";
+        $sql = "SELECT id, first_name, last_name, email, password FROM users WHERE email = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -45,8 +41,6 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['user_email'] = $user['email'];
                 $_SESSION['login_time'] = time();
                 $_SESSION['last_activity'] = time();
-                $_SESSION['is_admin'] = $user['is_admin'];
-                $_SESSION['role'] = $user['role'] ?? 'user';
                 
                 // Set remember me cookie
                 if($remember_me) {
@@ -62,16 +56,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                     setcookie('remember_token', $token, time() + (86400 * 30), '/', '', false, true);
                 }
                 
-                // Redirect based on user role
-                if($user['is_admin'] == 1) {
-                    // User is admin, redirect to admin panel
-                    header("Location: admin/dashboard.php");
-                } else {
-                    // Regular user, redirect to dashboard
-                    $redirect_page = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'dashboard.php';
-                    unset($_SESSION['redirect_after_login']);
-                    header("Location: $redirect_page");
-                }
+                // Redirect to dashboard or requested page
+                $redirect_page = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'dashboard.php';
+                unset($_SESSION['redirect_after_login']);
+                header("Location: $redirect_page");
                 exit();
             } else {
                 $error_message = "Invalid email or password";
@@ -92,7 +80,6 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* Your existing styles */
         * {
             margin: 0;
             padding: 0;
@@ -199,7 +186,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .input-group input {
             width: 100%;
-            padding: 0.6rem 55px 0.6rem 38px; /* Added right padding for eye icon */
+            padding: 0.6rem 55px 0.6rem 38px;
             border: 2px solid #f0e0d4;
             border-radius: 10px;
             font-size: 0.85rem;
@@ -523,7 +510,6 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             
             if (!email || !password) {
                 e.preventDefault();
-                // You can replace this with a proper error display
                 const errorDiv = document.querySelector('.error-message');
                 if (errorDiv) {
                     errorDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please fill in all fields';
