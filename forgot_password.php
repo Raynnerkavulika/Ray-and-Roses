@@ -58,7 +58,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                             <p>Hello <strong>" . htmlspecialchars($user['first_name']) . "</strong>,</p>
                             <p>We received a request to reset your password. Click the button below to create a new password:</p>
                             <p style='text-align: center; margin: 30px 0;'>
-                                <a href='" . $reset_link . "' class='btn' style='color: white;'>Reset Password</a>
+                                <a href='" . $reset_link . "' class='btn' style='color: white; text-decoration: none;'>Reset Password</a>
                             </p>
                             <p>This link will expire in 1 hour.</p>
                             <p>If you didn't request this, please ignore this email.</p>
@@ -95,28 +95,55 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
         $check_stmt->close();
     }
 }
-
-include 'header.php';
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password - Ray & Roses</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #fff5ef 0%, #ffe8e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
         .forgot-container {
             max-width: 500px;
-            margin: 3rem auto;
-            padding: 0 5%;
+            width: 100%;
+            margin: 0 auto;
         }
         
         .forgot-card {
             background: white;
             border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .forgot-header {
@@ -124,21 +151,33 @@ include 'header.php';
             margin-bottom: 2rem;
         }
         
-        .forgot-header i {
-            font-size: 3rem;
-            color: #c45c4a;
-            margin-bottom: 1rem;
+        .forgot-header .icon-wrapper {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #c45c4a, #e8876e);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        
+        .forgot-header .icon-wrapper i {
+            font-size: 2rem;
+            color: white;
         }
         
         .forgot-header h1 {
             font-family: 'Playfair Display', serif;
             font-size: 1.8rem;
             color: #2d2a24;
+            margin-bottom: 0.5rem;
         }
         
         .forgot-header p {
             color: #7b6b5c;
-            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
         
         .form-group {
@@ -150,6 +189,7 @@ include 'header.php';
             margin-bottom: 0.5rem;
             color: #2d2a24;
             font-weight: 500;
+            font-size: 0.9rem;
         }
         
         .input-group {
@@ -162,6 +202,7 @@ include 'header.php';
             top: 50%;
             transform: translateY(-50%);
             color: #c45c4a;
+            z-index: 1;
         }
         
         .form-group input {
@@ -169,8 +210,9 @@ include 'header.php';
             padding: 0.8rem 1rem 0.8rem 45px;
             border: 2px solid #f0e0d4;
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             transition: 0.3s;
+            font-family: 'Inter', sans-serif;
         }
         
         .form-group input:focus {
@@ -184,17 +226,23 @@ include 'header.php';
             background: linear-gradient(135deg, #c45c4a, #e8876e);
             color: white;
             border: none;
-            padding: 1rem;
+            padding: 0.9rem;
             border-radius: 12px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: 0.3s;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
         
         .btn-reset:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(196,92,74,0.3);
+            background: linear-gradient(135deg, #a84a3a, #d47358);
         }
         
         .alert-success {
@@ -202,31 +250,80 @@ include 'header.php';
             color: #2e7d32;
             padding: 1rem;
             border-radius: 12px;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             border-left: 4px solid #4caf50;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .alert-success a {
+            color: #2e7d32;
+            font-weight: 600;
+            word-break: break-all;
         }
         
         .alert-error {
             background: #fee;
-            color: #f44336;
+            color: #c45c4a;
             padding: 1rem;
             border-radius: 12px;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             border-left: 4px solid #f44336;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
         .back-link {
             text-align: center;
             margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #f0e0d4;
         }
         
         .back-link a {
             color: #c45c4a;
             text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
         .back-link a:hover {
+            color: #a84a3a;
             text-decoration: underline;
+        }
+        
+        .home-link-container {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        
+        .home-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f5f0eb;
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            color: #c45c4a;
+            font-weight: 600;
+            transition: 0.3s;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+        }
+        
+        .home-link:hover {
+            background: #c45c4a;
+            color: white;
+            transform: translateY(-2px);
         }
         
         @media (max-width: 768px) {
@@ -237,50 +334,65 @@ include 'header.php';
             .forgot-header h1 {
                 font-size: 1.5rem;
             }
+            
+            .forgot-header .icon-wrapper {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .forgot-header .icon-wrapper i {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
-
-<div class="forgot-container">
-    <div class="forgot-card">
-        <div class="forgot-header">
-            <i class="fas fa-key"></i>
-            <h1>Forgot Password?</h1>
-            <p>Enter your email address and we'll send you a link to reset your password.</p>
-        </div>
-        
-        <?php if($error_message): ?>
-        <div class="alert-error">
-            <i class="fas fa-exclamation-circle"></i> <?php echo $error_message; ?>
-        </div>
-        <?php endif; ?>
-        
-        <?php if($success_message): ?>
-        <div class="alert-success">
-            <i class="fas fa-check-circle"></i> <?php echo $success_message; ?>
-        </div>
-        <?php endif; ?>
-        
-        <form method="POST">
-            <div class="form-group">
-                <label>Email Address</label>
-                <div class="input-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" required placeholder="your@email.com">
+    <div class="forgot-container">
+        <div class="forgot-card">
+            <div class="forgot-header">
+                <div class="icon-wrapper">
+                    <i class="fas fa-key"></i>
                 </div>
+                <h1>Forgot Password?</h1>
+                <p>Enter your email address and we'll send you a link to reset your password.</p>
             </div>
-            <button type="submit" class="btn-reset">
-                <i class="fas fa-paper-plane"></i> Send Reset Link
-            </button>
-        </form>
-        
-        <div class="back-link">
-            <a href="login.php"><i class="fas fa-arrow-left"></i> Back to Login</a>
+            
+            <?php if($error_message): ?>
+            <div class="alert-error">
+                <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error_message); ?>
+            </div>
+            <?php endif; ?>
+            
+            <?php if($success_message): ?>
+            <div class="alert-success">
+                <i class="fas fa-check-circle"></i> <?php echo $success_message; ?>
+            </div>
+            <?php endif; ?>
+            
+            <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <div class="input-group">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" required placeholder="your@email.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-reset">
+                    <i class="fas fa-paper-plane"></i> Send Reset Link
+                </button>
+            </form>
+            
+            <div class="back-link">
+                <a href="login.php"><i class="fas fa-arrow-left"></i> Back to Login</a>
+            </div>
+            
+            <div class="home-link-container">
+                <a href="index.php" class="home-link">
+                    <i class="fas fa-home"></i> Back to Home
+                </a>
+            </div>
         </div>
     </div>
-</div>
-
-<?php include 'footer.php'; ?>
 </body>
 </html>

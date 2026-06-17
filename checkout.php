@@ -223,6 +223,12 @@ include 'header.php';
         transform: translateY(-2px);
     }
 
+    .place-order-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+    }
+
     /* Back to Cart Button - Styled */
     .back-to-cart {
         display: flex;
@@ -255,6 +261,123 @@ include 'header.php';
 
     .back-to-cart:hover i {
         transform: translateX(-3px);
+    }
+
+    /* M-Pesa Modal Styles */
+    .mpesa-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 4000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .mpesa-modal-content {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateY(-50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .mpesa-modal-content i {
+        font-size: 4rem;
+        color: #4CAF50;
+        margin-bottom: 1rem;
+    }
+
+    .mpesa-modal-content h3 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .mpesa-modal-content p {
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+
+    .mpesa-modal-content .amount {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #c45c4a;
+        margin: 1rem 0;
+    }
+
+    .mpesa-modal-content .phone-number {
+        background: #f5f0eb;
+        padding: 0.5rem;
+        border-radius: 10px;
+        font-weight: bold;
+        margin: 1rem 0;
+    }
+
+    .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .modal-btn {
+        flex: 1;
+        padding: 0.8rem;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+
+    .modal-btn.confirm {
+        background: #c45c4a;
+        color: white;
+    }
+
+    .modal-btn.confirm:hover {
+        background: #a84a3a;
+    }
+
+    .modal-btn.cancel {
+        background: #f0e0d4;
+        color: #3d2a1f;
+    }
+
+    .modal-btn.cancel:hover {
+        background: #e0d0c4;
+    }
+
+    .loader {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #c45c4a;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 
     @media (max-width: 768px) {
@@ -372,10 +495,30 @@ include 'header.php';
     </div>
 </div>
 
+<!-- M-Pesa Payment Modal -->
+<div id="mpesaModal" class="mpesa-modal">
+    <div class="mpesa-modal-content">
+        <i class="fas fa-mobile-alt"></i>
+        <h3>M-Pesa Payment</h3>
+        <p>You will receive a prompt on your phone to complete payment</p>
+        <div class="amount" id="modalAmount">$0.00</div>
+        <div class="phone-number" id="modalPhone">Phone: </div>
+        <p><small>Please check your phone and enter your M-Pesa PIN to complete the payment</small></p>
+        <div class="modal-buttons">
+            <button class="modal-btn cancel" onclick="closeMpesaModal()">Cancel</button>
+            <button class="modal-btn confirm" id="confirmPaymentBtn" onclick="confirmMpesaPayment()">
+                I've Completed Payment
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 let cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
 let appliedCoupon = localStorage.getItem('appliedCoupon');
 let discount = parseFloat(localStorage.getItem('discount')) || 0;
+let pendingOrderData = null;
+let orderCheckInterval = null;
 
 // Payment method selection
 document.querySelectorAll('.payment-option').forEach(option => {
@@ -470,13 +613,29 @@ function renderOrderSummary() {
     orderTotals.innerHTML = totalsHtml;
 }
 
-function placeOrder() {
-    if (cart.length === 0) {
-        showToast('Your cart is empty!');
-        window.location.href = 'cart.php';
-        return;
+function validateForm() {
+    const firstName = document.getElementById('firstName').value;
+    const lastName = document.getElementById('lastName').value;
+    const email = document.getElementById('email').value;
+    const phone = document.getElementById('phone').value;
+    const address = document.getElementById('address').value;
+    const city = document.getElementById('city').value;
+    
+    if (!firstName || !lastName || !email || !phone || !address || !city) {
+        showToast('Please fill in all required fields');
+        return false;
     }
     
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+        showToast('Please enter a valid email address');
+        return false;
+    }
+    
+    return true;
+}
+
+function prepareOrderData() {
     const firstName = document.getElementById('firstName').value;
     const lastName = document.getElementById('lastName').value;
     const email = document.getElementById('email').value;
@@ -487,25 +646,13 @@ function placeOrder() {
     const notes = document.getElementById('notes').value;
     const paymentMethod = document.getElementById('paymentMethod').value;
     
-    if (!firstName || !lastName || !email || !phone || !address || !city) {
-        showToast('Please fill in all required fields');
-        return;
-    }
-    
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(email)) {
-        showToast('Please enter a valid email address');
-        return;
-    }
-    
     const subtotal = getCartSubtotal();
     const shipping = getShipping();
     const discountAmount = appliedCoupon ? (appliedCoupon === 'FREE50' ? 5 : subtotal * (discount / 100)) : 0;
     const total = getCartTotal() + shipping;
     const orderNumber = 'ORD-' + Date.now();
     
-    // Prepare order data for PHP
-    const orderData = {
+    return {
         order_number: orderNumber,
         first_name: firstName,
         last_name: lastName,
@@ -520,6 +667,7 @@ function placeOrder() {
         discount: discountAmount,
         total: total,
         payment_method: paymentMethod,
+        payment_status: paymentMethod === 'mpesa' ? 'pending' : 'completed',
         items: cart.map(item => ({
             product_id: item.id,
             product_name: item.name,
@@ -528,14 +676,175 @@ function placeOrder() {
             subtotal: item.price * item.quantity
         }))
     };
+}
+
+function placeOrder() {
+    if (cart.length === 0) {
+        showToast('Your cart is empty!');
+        window.location.href = 'cart.php';
+        return;
+    }
     
-    // Show loading state
+    if (!validateForm()) {
+        return;
+    }
+    
+    const paymentMethod = document.getElementById('paymentMethod').value;
+    
+    if (paymentMethod === 'mpesa') {
+        // For M-Pesa, show payment modal first
+        const mpesaNumber = document.getElementById('mpesaNumber').value;
+        if (!mpesaNumber) {
+            showToast('Please enter your M-Pesa phone number');
+            return;
+        }
+        
+        // Validate phone number format
+        const phonePattern = /^07[0-9]{8}$|^01[0-9]{8}$/;
+        if (!phonePattern.test(mpesaNumber)) {
+            showToast('Please enter a valid Kenyan phone number (e.g., 0712345678)');
+            return;
+        }
+        
+        // Prepare order data
+        pendingOrderData = prepareOrderData();
+        pendingOrderData.mpesa_phone = mpesaNumber;
+        
+        // Show M-Pesa payment modal
+        const modal = document.getElementById('mpesaModal');
+        document.getElementById('modalAmount').innerText = '$' + pendingOrderData.total.toFixed(2);
+        document.getElementById('modalPhone').innerHTML = `Phone: ${mpesaNumber}`;
+        modal.style.display = 'flex';
+        
+        // Initiate STK Push
+        initiateMpesaPayment();
+    } else {
+        // For other payment methods, process normally
+        processOrder();
+    }
+}
+
+function initiateMpesaPayment() {
     const placeOrderBtn = document.querySelector('.place-order-btn');
-    const originalText = placeOrderBtn.innerHTML;
-    placeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     placeOrderBtn.disabled = true;
     
-    // Send order to PHP backend
+    // Send STK Push request to backend
+    fetch('mpesa_stk_push.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            phone: pendingOrderData.mpesa_phone,
+            amount: pendingOrderData.total,
+            order_number: pendingOrderData.order_number
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Store checkout request ID to check payment status
+            localStorage.setItem('pendingOrderNumber', pendingOrderData.order_number);
+            localStorage.setItem('checkoutRequestID', data.CheckoutRequestID);
+            
+            // Start polling for payment status
+            startPaymentStatusCheck(pendingOrderData.order_number);
+        } else {
+            showToast('Failed to initiate M-Pesa payment: ' + (data.message || 'Unknown error'));
+            document.querySelector('.place-order-btn').disabled = false;
+            closeMpesaModal();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error initiating M-Pesa payment. Please try again.');
+        document.querySelector('.place-order-btn').disabled = false;
+        closeMpesaModal();
+    });
+}
+
+function startPaymentStatusCheck(orderNumber) {
+    // Check payment status every 3 seconds for up to 2 minutes
+    let attempts = 0;
+    const maxAttempts = 40;
+    
+    if (orderCheckInterval) {
+        clearInterval(orderCheckInterval);
+    }
+    
+    orderCheckInterval = setInterval(() => {
+        attempts++;
+        
+        fetch(`check_payment_status.php?order_number=${orderNumber}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.payment_status === 'completed') {
+                    // Payment successful
+                    clearInterval(orderCheckInterval);
+                    orderCheckInterval = null;
+                    completeOrderAfterPayment(orderNumber);
+                } else if (data.payment_status === 'failed' || attempts >= maxAttempts) {
+                    // Payment failed or timed out
+                    clearInterval(orderCheckInterval);
+                    orderCheckInterval = null;
+                    if (data.payment_status === 'failed') {
+                        showToast('M-Pesa payment failed. Please try again.');
+                    } else {
+                        showToast('Payment verification timed out. Please check your order status.');
+                    }
+                    document.querySelector('.place-order-btn').disabled = false;
+                    closeMpesaModal();
+                }
+            })
+            .catch(error => {
+                console.error('Error checking payment status:', error);
+                if (attempts >= maxAttempts) {
+                    clearInterval(orderCheckInterval);
+                    orderCheckInterval = null;
+                    document.querySelector('.place-order-btn').disabled = false;
+                    closeMpesaModal();
+                }
+            });
+    }, 3000);
+}
+
+function confirmMpesaPayment() {
+    // User confirms they've completed payment on their phone
+    // The payment status check is already running, so just show waiting message
+    const confirmBtn = document.getElementById('confirmPaymentBtn');
+    confirmBtn.innerHTML = '<span class="loader"></span> Verifying...';
+    confirmBtn.disabled = true;
+    
+    // Check status immediately
+    fetch(`check_payment_status.php?order_number=${pendingOrderData.order_number}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.payment_status === 'completed') {
+                if (orderCheckInterval) {
+                    clearInterval(orderCheckInterval);
+                    orderCheckInterval = null;
+                }
+                completeOrderAfterPayment(pendingOrderData.order_number);
+            } else {
+                // Still waiting, keep checking
+                showToast('Verifying payment... Please wait a moment');
+                confirmBtn.innerHTML = 'I\'ve Completed Payment';
+                confirmBtn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            confirmBtn.innerHTML = 'I\'ve Completed Payment';
+            confirmBtn.disabled = false;
+        });
+}
+
+function completeOrderAfterPayment(orderNumber) {
+    // Save the order to database with completed status
+    const orderData = { ...pendingOrderData };
+    orderData.payment_status = 'completed';
+    orderData.order_number = orderNumber;
+    
     fetch('save_order.php', {
         method: 'POST',
         headers: {
@@ -549,12 +858,68 @@ function placeOrder() {
             // Save order to localStorage for confirmation page
             localStorage.setItem('lastOrder', JSON.stringify({
                 order_number: orderNumber,
-                total: total,
-                payment_method: paymentMethod,
-                shipping: { address: address, city: city }
+                total: pendingOrderData.total,
+                payment_method: 'mpesa',
+                payment_status: 'completed',
+                shipping: { 
+                    address: pendingOrderData.address, 
+                    city: pendingOrderData.city 
+                }
             }));
             
-            // Clear cart
+            // Clear cart and related data
+            localStorage.removeItem('flowerCart');
+            localStorage.removeItem('appliedCoupon');
+            localStorage.removeItem('discount');
+            localStorage.removeItem('pendingOrderNumber');
+            localStorage.removeItem('checkoutRequestID');
+            
+            closeMpesaModal();
+            showToast('Payment successful! Order placed successfully.');
+            
+            setTimeout(() => {
+                window.location.href = 'order-confirmation.php';
+            }, 1500);
+        } else {
+            showToast('Error saving order: ' + data.message);
+            document.querySelector('.place-order-btn').disabled = false;
+            closeMpesaModal();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error completing order. Please contact support.');
+        document.querySelector('.place-order-btn').disabled = false;
+        closeMpesaModal();
+    });
+}
+
+function processOrder() {
+    const orderData = prepareOrderData();
+    orderData.payment_status = 'completed';
+    
+    const placeOrderBtn = document.querySelector('.place-order-btn');
+    const originalText = placeOrderBtn.innerHTML;
+    placeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    placeOrderBtn.disabled = true;
+    
+    fetch('save_order.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            localStorage.setItem('lastOrder', JSON.stringify({
+                order_number: orderData.order_number,
+                total: orderData.total,
+                payment_method: orderData.payment_method,
+                shipping: { address: orderData.address, city: orderData.city }
+            }));
+            
             localStorage.removeItem('flowerCart');
             localStorage.removeItem('appliedCoupon');
             localStorage.removeItem('discount');
@@ -578,6 +943,19 @@ function placeOrder() {
     });
 }
 
+function closeMpesaModal() {
+    const modal = document.getElementById('mpesaModal');
+    modal.style.display = 'none';
+    const confirmBtn = document.getElementById('confirmPaymentBtn');
+    confirmBtn.innerHTML = 'I\'ve Completed Payment';
+    confirmBtn.disabled = false;
+    
+    if (orderCheckInterval) {
+        clearInterval(orderCheckInterval);
+        orderCheckInterval = null;
+    }
+}
+
 function showToast(message) {
     let toast = document.getElementById('toast');
     if (!toast) {
@@ -590,7 +968,7 @@ function showToast(message) {
     toast.classList.add('show');
     setTimeout(() => {
         toast.classList.remove('show');
-    }, 2000);
+    }, 3000);
 }
 
 function escapeHtml(str) {

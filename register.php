@@ -26,12 +26,16 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "Please fill in all required fields";
     } elseif($password !== $confirm_password) {
         $error_message = "Passwords do not match!";
-    } elseif(strlen($password) < 6) {
-        $error_message = "Password must be at least 6 characters";
     } elseif(!$terms) {
         $error_message = "Please agree to the Terms of Service";
     } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_message = "Please enter a valid email address";
+        $error_message = "Please enter a valid email address (e.g., name@domain.com)";
+    } elseif(!preg_match('/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
+        $error_message = "Please enter a valid email address format (e.g., name@domain.com)";
+    } elseif(!preg_match('/^[0-9]{10,15}$/', $phone) && !empty($phone)) {
+        $error_message = "Please enter a valid phone number (10-15 digits only)";
+    } elseif(!preg_match('/[a-z]/', $password) || !preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[\W_]/', $password) || strlen($password) < 8) {
+        $error_message = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character";
     } else {
         // Check if email already exists
         $check_sql = "SELECT id FROM users WHERE email = ?";
@@ -197,7 +201,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .input-group input {
             width: 100%;
-            padding: 0.55rem 0.8rem 0.55rem 38px;
+            padding: 0.55rem 55px 0.55rem 38px; /* Increased right padding */
             border: 2px solid #f0e0d4;
             border-radius: 10px;
             font-size: 0.8rem;
@@ -209,6 +213,36 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             outline: none;
             border-color: #c45c4a;
             box-shadow: 0 0 0 2px rgba(196,92,74,0.1);
+        }
+
+        /* Password toggle button */
+        .toggle-password {
+            position: absolute;
+            right: 15px; /* Moved a bit to the right */
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #7a5a48;
+            cursor: pointer;
+            font-size: 1rem; /* Slightly larger */
+            padding: 8px 10px; /* More padding for better click area */
+            z-index: 2;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .toggle-password:hover {
+            color: #c45c4a;
+            background: rgba(196, 92, 74, 0.08);
+        }
+
+        .toggle-password:focus {
+            outline: none;
         }
 
         .form-row {
@@ -314,6 +348,23 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             cursor: pointer;
         }
 
+        .password-strength {
+            font-size: 0.65rem;
+            margin-top: -0.5rem;
+            margin-bottom: 0.8rem;
+            padding-left: 38px;
+        }
+
+        .password-strength span {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .strength-weak { color: #d32f2f; }
+        .strength-medium { color: #f57c00; }
+        .strength-strong { color: #388e3c; }
+
         @media (max-width: 768px) {
             .auth-container {
                 flex-direction: column;
@@ -331,6 +382,15 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             body {
                 padding: 0.5rem;
+            }
+            
+            .input-group input {
+                padding: 0.55rem 50px 0.55rem 35px;
+            }
+            
+            .toggle-password {
+                right: 12px;
+                padding: 6px 8px;
             }
         }
 
@@ -370,7 +430,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 <li><i class="fas fa-check-circle"></i> Exclusive collections</li>
                 <li><i class="fas fa-check-circle"></i> Birthday reminders</li>
                 <li><i class="fas fa-check-circle"></i> 10% off first order</li>
-                <li><i class="fas fa-check-circle"></i> Free delivery $50+</li>
+                <li><i class="fas fa-check-circle"></i> Free delivery Ksh 5000+</li>
             </ul>
         </div>
         <div class="auth-right">
@@ -403,24 +463,32 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="input-group">
                     <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" id="email" placeholder="Email Address" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
+                    <input type="email" name="email" id="email" placeholder="Email Address (e.g., name@domain.com)" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
                 </div>
                 
                 <div class="input-group">
                     <i class="fas fa-phone"></i>
-                    <input type="tel" name="phone" id="phone" placeholder="Phone (optional)" value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
+                    <input type="tel" name="phone" id="phone" placeholder="Phone (optional - 10-15 digits)" value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
                 </div>
                 
                 <div class="form-row">
                     <div class="input-group">
                         <i class="fas fa-lock"></i>
                         <input type="password" name="password" id="password" placeholder="Password" required>
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password')" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye" id="passwordEyeIcon"></i>
+                        </button>
                     </div>
                     <div class="input-group">
                         <i class="fas fa-check-circle"></i>
                         <input type="password" name="confirm_password" id="confirmPassword" placeholder="Confirm Password" required>
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirmPassword')" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye" id="confirmPasswordEyeIcon"></i>
+                        </button>
                     </div>
                 </div>
+                
+                <div class="password-strength" id="passwordStrength"></div>
                 
                 <div class="input-group" style="margin-bottom: 0.5rem;">
                     <label class="checkbox-label">
@@ -451,32 +519,117 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <script>
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const eyeIcon = document.getElementById(inputId + 'EyeIcon');
+            
+            if (!input || !eyeIcon) return;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        // Password strength checker
+        document.getElementById('password').addEventListener('input', function() {
+            const password = this.value;
+            const strengthDiv = document.getElementById('passwordStrength');
+            
+            if (password.length === 0) {
+                strengthDiv.innerHTML = '';
+                return;
+            }
+            
+            let strength = 0;
+            let strengthText = '';
+            let strengthClass = '';
+            
+            // Check length
+            if (password.length >= 8) strength++;
+            if (password.length >= 12) strength++;
+            
+            // Check for uppercase
+            if (/[A-Z]/.test(password)) strength++;
+            
+            // Check for lowercase
+            if (/[a-z]/.test(password)) strength++;
+            
+            // Check for numbers
+            if (/[0-9]/.test(password)) strength++;
+            
+            // Check for special characters
+            if (/[\W_]/.test(password)) strength++;
+            
+            // Determine strength
+            if (strength <= 2) {
+                strengthText = 'Weak';
+                strengthClass = 'strength-weak';
+            } else if (strength <= 4) {
+                strengthText = 'Medium';
+                strengthClass = 'strength-medium';
+            } else {
+                strengthText = 'Strong';
+                strengthClass = 'strength-strong';
+            }
+            
+            strengthDiv.innerHTML = `Password Strength: <span class="${strengthClass}">${strengthText}</span>`;
+        });
+
+        // Client-side validation
         document.getElementById('registerForm').addEventListener('submit', function(e) {
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('email').value;
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const termsChecked = document.getElementById('termsCheckbox').checked;
             
+            // Check required fields
             if (!firstName || !lastName || !email || !password) {
                 e.preventDefault();
                 showError('Please fill in all required fields');
                 return false;
             }
             
+            // Validate email format
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(email)) {
+                e.preventDefault();
+                showError('Please enter a valid email address (e.g., name@domain.com)');
+                return false;
+            }
+            
+            // Validate phone number (if provided)
+            if (phone && !/^[0-9]{10,15}$/.test(phone)) {
+                e.preventDefault();
+                showError('Please enter a valid phone number (10-15 digits only)');
+                return false;
+            }
+            
+            // Check password match
             if (password !== confirmPassword) {
                 e.preventDefault();
                 showError('Passwords do not match!');
                 return false;
             }
             
-            if (password.length < 6) {
+            // Validate password strength
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).{8,}$/;
+            if (!passwordRegex.test(password)) {
                 e.preventDefault();
-                showError('Password must be at least 6 characters');
+                showError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character');
                 return false;
             }
             
+            // Check terms
             if (!termsChecked) {
                 e.preventDefault();
                 showError('Please agree to the Terms of Service');
@@ -499,7 +652,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             
             setTimeout(() => {
                 errorDiv.style.display = 'none';
-            }, 3000);
+            }, 5000);
         }
     </script>
 </body>

@@ -199,7 +199,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .input-group input {
             width: 100%;
-            padding: 0.6rem 0.8rem 0.6rem 38px;
+            padding: 0.6rem 55px 0.6rem 38px; /* Added right padding for eye icon */
             border: 2px solid #f0e0d4;
             border-radius: 10px;
             font-size: 0.85rem;
@@ -211,6 +211,36 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             outline: none;
             border-color: #c45c4a;
             box-shadow: 0 0 0 2px rgba(196,92,74,0.1);
+        }
+
+        /* Password toggle button */
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #7a5a48;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 8px 10px;
+            z-index: 2;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .toggle-password:hover {
+            color: #c45c4a;
+            background: rgba(196, 92, 74, 0.08);
+        }
+
+        .toggle-password:focus {
+            outline: none;
         }
 
         .checkbox-group {
@@ -238,6 +268,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #c45c4a;
             text-decoration: none;
             font-size: 0.75rem;
+        }
+
+        .forgot-link:hover {
+            text-decoration: underline;
         }
 
         .login-btn {
@@ -276,6 +310,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             font-weight: 600;
         }
 
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+
         .social-login {
             margin-top: 1rem;
         }
@@ -298,6 +336,14 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             background: #f0e0d4;
         }
 
+        .social-login p::before {
+            left: 0;
+        }
+
+        .social-login p::after {
+            right: 0;
+        }
+
         .social-icons {
             display: flex;
             gap: 0.8rem;
@@ -316,6 +362,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #c45c4a;
             font-size: 0.9rem;
             transition: 0.3s;
+            text-decoration: none;
         }
 
         .social-icons a:hover {
@@ -344,6 +391,12 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 0.7rem;
         }
 
+        .home-link:hover {
+            background: #c45c4a;
+            color: white;
+            transform: translateY(-2px);
+        }
+
         .error-message {
             background: #fee;
             color: #c45c4a;
@@ -354,6 +407,27 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
             display: flex;
             align-items: center;
             gap: 0.4rem;
+        }
+
+        @media (max-width: 768px) {
+            .auth-container {
+                flex-direction: column;
+                max-width: 360px;
+            }
+            .auth-left {
+                padding: 1rem;
+                text-align: center;
+            }
+            .auth-right {
+                padding: 1rem;
+            }
+            .input-group input {
+                padding: 0.6rem 50px 0.6rem 35px;
+            }
+            .toggle-password {
+                right: 12px;
+                padding: 6px 8px;
+            }
         }
     </style>
 </head>
@@ -385,6 +459,9 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
                     <input type="password" name="password" id="password" placeholder="Password" required>
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                        <i class="fas fa-eye" id="passwordEyeIcon"></i>
+                    </button>
                 </div>
                 
                 <div class="checkbox-group">
@@ -421,17 +498,64 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
     <script>
+        // Toggle password visibility
+        function togglePasswordVisibility() {
+            const input = document.getElementById('password');
+            const eyeIcon = document.getElementById('passwordEyeIcon');
+            
+            if (!input || !eyeIcon) return;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        // Form validation
         document.getElementById('loginForm').addEventListener('submit', function(e) {
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             
             if (!email || !password) {
                 e.preventDefault();
-                alert('Please fill in all fields');
+                // You can replace this with a proper error display
+                const errorDiv = document.querySelector('.error-message');
+                if (errorDiv) {
+                    errorDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please fill in all fields';
+                    errorDiv.style.display = 'flex';
+                } else {
+                    alert('Please fill in all fields');
+                }
                 return false;
             }
+            
+            // Validate email format
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(email)) {
+                e.preventDefault();
+                const errorDiv = document.querySelector('.error-message');
+                if (errorDiv) {
+                    errorDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please enter a valid email address';
+                    errorDiv.style.display = 'flex';
+                }
+                return false;
+            }
+            
             return true;
         });
+
+        // Hide error message after 5 seconds
+        setTimeout(() => {
+            const errorDiv = document.querySelector('.error-message');
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }, 5000);
     </script>
 </body>
 </html>

@@ -209,3 +209,23 @@ CREATE TABLE IF NOT EXISTS password_resets (
     INDEX idx_token (token),
     INDEX idx_email (email)
 );
+
+-- Check and add only missing columns
+-- First, check if mpesa_checkout_id column exists (if not, add it)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS mpesa_checkout_id VARCHAR(100) NULL;
+
+-- Check if payment_message column exists (if not, add it)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_message TEXT NULL;
+
+-- Create mpesa_transactions table (if it doesn't exist)
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(50) NOT NULL,
+    checkout_request_id VARCHAR(100) NOT NULL,
+    mpesa_receipt_number VARCHAR(50),
+    amount DECIMAL(10,2),
+    transaction_date VARCHAR(20),
+    result_code INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_order_number (order_number)
+);
