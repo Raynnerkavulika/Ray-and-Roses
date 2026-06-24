@@ -1,7 +1,7 @@
 <div class="sidebar">
     <div class="sidebar-header">
         <h2><i class="fas fa-crown"></i> Admin Panel</h2>
-        <p>Petal & Stem</p>
+        <p>Ray & Rosses</p>
     </div>
     <ul class="sidebar-menu">
         <li><a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></a></li>

@@ -2,7 +2,7 @@
 session_start();
 require_once '../config/database.php';
 
-// Add this to the top of ALL admin pages (dashboard.php, products.php, orders.php, users.php, etc.)
+// Admin access check
 if(!isset($_SESSION['admin_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] != 1) {
     header("Location: login.php");
     exit();
@@ -80,10 +80,27 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
         // Generate SKU
         $sku = generateSKU($name, $category);
         
+        // Ensure SKU is unique (prevent duplicate key errors)
+        $check_stmt = $conn->prepare("SELECT id FROM products WHERE sku = ?");
+        $check_stmt->bind_param("s", $sku);
+        $check_stmt->execute();
+        $check_stmt->store_result();
+        if ($check_stmt->num_rows > 0) {
+            // Regenerate with a new random number
+            $sku = generateSKU($name, $category);
+        }
+        $check_stmt->close();
+        
+        // Prepare and execute insert
         $insert_sql = "INSERT INTO products (name, description, full_description, price, original_price, category, stock, image, sku, status, featured, created_at) 
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         $insert_stmt = $conn->prepare($insert_sql);
-        $insert_stmt->bind_param("sssddissisi", 
+        
+        // Correct bind types: 
+        // s = string, d = double, i = integer
+        // order: name(s), description(s), full_description(s), price(d), original_price(d), 
+        //        category(s), stock(i), image(s), sku(s), status(s), featured(i)
+        $insert_stmt->bind_param("sssddsisssi", 
             $name, $description, $full_description, $price, $original_price, 
             $category, $stock, $image, $sku, $status, $featured
         );

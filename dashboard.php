@@ -581,10 +581,10 @@ include 'header.php';
                         <div class="price-container">
                             <div class="product-price">
                                 <?php if($discountPercent > 0): ?>
-                                    <span class="original-price">$<?php echo number_format($product['original_price'], 2); ?></span>
-                                    <span class="discounted-price">$<?php echo number_format($product['price'], 2); ?></span>
+                                    <span class="original-price">KSh <?php echo number_format($product['original_price'], 2); ?></span>
+                                    <span class="discounted-price">KSh <?php echo number_format($product['price'], 2); ?></span>
                                 <?php else: ?>
-                                    <span class="regular-price">$<?php echo number_format($product['price'], 2); ?></span>
+                                    <span class="regular-price">KSh <?php echo number_format($product['price'], 2); ?></span>
                                 <?php endif; ?>
                             </div>
                         </div>

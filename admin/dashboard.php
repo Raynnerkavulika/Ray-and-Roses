@@ -510,7 +510,7 @@ $recent_customers = $conn->query("SELECT id, first_name, last_name, email, creat
                 <h1><i class="fas fa-chart-line"></i> Dashboard</h1>
                 <div class="admin-info">
                     <span class="admin-badge"><i class="fas fa-shield-alt"></i> <?php echo $is_super_admin ? 'Super Admin' : 'Admin'; ?></span>
-                    <span>🌸 Welcome, <?php echo htmlspecialchars($admin_name); ?></span>
+                    <span> Welcome, <?php echo htmlspecialchars($admin_name); ?></span>
                     <?php if($is_super_admin): ?>
                     <span class="role-badge"><i class="fas fa-crown"></i> Full Access</span>
                     <?php endif; ?>

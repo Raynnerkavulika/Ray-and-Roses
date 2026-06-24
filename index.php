@@ -554,9 +554,8 @@ session_start();
     <h2 class="section-title">Our Beautiful Collection</h2>
     <div class="gallery-grid">
         <div class="gallery-item">
-            <img src="https://images.unsplash.com/photo-1561181286-d3fee7d78f8f?w=400&auto=format" alt="Rose Bouquet">
-            <div class="gallery-overlay">Romantic Roses</div>
-        </div>
+<img src="https://images.pexels.com/photos/56866/garden-rose-red-pink-56866.jpeg" alt="Red Roses">    <div class="gallery-overlay">Romantic Roses</div>
+</div>
         <div class="gallery-item">
             <img src="https://images.unsplash.com/photo-1582794543139-8ac9cb0f7b11?w=400&auto=format" alt="Sunflowers">
             <div class="gallery-overlay">Sunny Daisies</div>
