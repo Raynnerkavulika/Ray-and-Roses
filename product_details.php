@@ -6,6 +6,82 @@ require_once 'config/check_auth.php'; // Ensure user is logged in
 // Get product ID from URL
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
+// Handle AJAX requests for cart operations
+if(isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    $response = ['success' => false, 'message' => 'Invalid action'];
+    
+    switch($_POST['action']) {
+        case 'add':
+            $product_id = intval($_POST['product_id']);
+            $quantity = intval($_POST['quantity'] ?? 1);
+            $user_id = $_SESSION['user_id'];
+            
+            // Check if product exists and has stock
+            $check_sql = "SELECT id, price, stock FROM products WHERE id = ? AND status = 'active'";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("i", $product_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if($check_result->num_rows > 0) {
+                $product = $check_result->fetch_assoc();
+                
+                // Check if item already in cart
+                $check_cart_sql = "SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?";
+                $check_cart_stmt = $conn->prepare($check_cart_sql);
+                $check_cart_stmt->bind_param("ii", $user_id, $product_id);
+                $check_cart_stmt->execute();
+                $check_cart_result = $check_cart_stmt->get_result();
+                
+                if($check_cart_result->num_rows > 0) {
+                    // Update quantity
+                    $cart_item = $check_cart_result->fetch_assoc();
+                    $new_quantity = $cart_item['quantity'] + $quantity;
+                    
+                    $update_sql = "UPDATE cart SET quantity = ? WHERE id = ?";
+                    $update_stmt = $conn->prepare($update_sql);
+                    $update_stmt->bind_param("ii", $new_quantity, $cart_item['id']);
+                    
+                    if($update_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Cart updated successfully'];
+                    }
+                    $update_stmt->close();
+                } else {
+                    // Add new item
+                    $insert_sql = "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)";
+                    $insert_stmt = $conn->prepare($insert_sql);
+                    $insert_stmt->bind_param("iii", $user_id, $product_id, $quantity);
+                    
+                    if($insert_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Product added to cart'];
+                    }
+                    $insert_stmt->close();
+                }
+                $check_cart_stmt->close();
+            }
+            $check_stmt->close();
+            break;
+            
+        case 'get_count':
+            $user_id = $_SESSION['user_id'];
+            $count_sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM cart WHERE user_id = ?";
+            $count_stmt = $conn->prepare($count_sql);
+            $count_stmt->bind_param("i", $user_id);
+            $count_stmt->execute();
+            $count_result = $count_stmt->get_result();
+            $count_row = $count_result->fetch_assoc();
+            $cart_count = $count_row['total'] ?? 0;
+            $count_stmt->close();
+            
+            $response = ['success' => true, 'count' => $cart_count];
+            break;
+    }
+    
+    echo json_encode($response);
+    exit();
+}
+
 // Fetch product from database
 $product_sql = "SELECT * FROM products WHERE id = ? AND status = 'active'";
 $product_stmt = $conn->prepare($product_sql);
@@ -354,6 +430,11 @@ include 'header.php';
         cursor: not-allowed;
     }
 
+    .add-to-cart-btn.loading {
+        opacity: 0.7;
+        cursor: wait;
+    }
+
     .wishlist-btn {
         flex: 1;
         background: transparent;
@@ -655,6 +736,27 @@ include 'header.php';
         font-weight: 700;
     }
 
+    /* Toast */
+    .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2d2a24;
+        color: white;
+        padding: 0.8rem 1.5rem;
+        border-radius: 50px;
+        z-index: 3000;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .toast.show {
+        opacity: 1;
+    }
+
     @media (max-width: 968px) {
         .product-main {
             grid-template-columns: 1fr;
@@ -741,7 +843,7 @@ include 'header.php';
                 </div>
                 <div class="meta-item">
                     <span class="meta-label">SKU:</span>
-                    <span class="meta-value"><?php echo $product['sku']; ?></span>
+                    <span class="meta-value"><?php echo $product['sku'] ?? 'N/A'; ?></span>
                 </div>
                 <div class="meta-item">
                     <span class="meta-label">Category:</span>
@@ -761,7 +863,7 @@ include 'header.php';
             
             <!-- Action Buttons -->
             <div class="action-buttons">
-                <button class="add-to-cart-btn" onclick="addToCart()" <?php echo $product['stock'] == 0 ? 'disabled' : ''; ?>>
+                <button class="add-to-cart-btn" id="addToCartBtn" onclick="addToCart()" <?php echo $product['stock'] == 0 ? 'disabled' : ''; ?>>
                     <i class="fas fa-shopping-cart"></i> Add to Cart
                 </button>
                 <button class="wishlist-btn" onclick="addToWishlist(<?php echo $product['id']; ?>)">
@@ -953,34 +1055,44 @@ function changeQuantity(delta) {
     quantityInput.value = newValue;
 }
 
-// Add to cart
+// Add to cart using database
 function addToCart() {
     const quantity = parseInt(document.getElementById('quantity').value);
-    const product = {
-        id: <?php echo $product['id']; ?>,
-        name: '<?php echo addslashes($product['name']); ?>',
-        price: <?php echo $product['price']; ?>,
-        image: '<?php echo $product['image']; ?>'
-    };
+    const productId = <?php echo $product['id']; ?>;
+    const btn = document.getElementById('addToCartBtn');
     
-    let cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
-    const existing = cart.find(item => item.id === product.id);
+    // Show loading state
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
     
-    if (existing) {
-        existing.quantity += quantity;
-    } else {
-        cart.push({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: quantity,
-            image: product.image
-        });
-    }
-    
-    localStorage.setItem('flowerCart', JSON.stringify(cart));
-    showToast(`${quantity} × ${product.name} added to cart! ✨`);
-    updateCartCount();
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'add',
+            product_id: productId,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`${quantity} × ${<?php echo json_encode($product['name']); ?>} added to cart! ✨`);
+            updateCartCount();
+        } else {
+            showToast(data.message || 'Error adding to cart');
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to cart');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.innerHTML = '<i class="fas fa-shopping-cart"></i> Add to Cart';
+    });
 }
 
 // Add to wishlist
@@ -988,14 +1100,23 @@ function addToWishlist(productId) {
     window.location.href = `wishlist.php?add=${productId}`;
 }
 
-// Update cart count
+// Update cart count from database
 function updateCartCount() {
-    const cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const cartCountElements = document.querySelectorAll('.cart-count');
-    cartCountElements.forEach(el => {
-        if (el) el.textContent = totalItems;
-    });
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'get_count' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const cartCountElements = document.querySelectorAll('.cart-count');
+            cartCountElements.forEach(el => {
+                if (el) el.textContent = data.count;
+            });
+        }
+    })
+    .catch(error => console.error('Error fetching cart count:', error));
 }
 
 // Show toast notification
@@ -1006,32 +1127,6 @@ function showToast(message) {
         toast.id = 'toast';
         toast.className = 'toast';
         document.body.appendChild(toast);
-        
-        if (!document.querySelector('#toast-styles')) {
-            const style = document.createElement('style');
-            style.id = 'toast-styles';
-            style.textContent = `
-                .toast {
-                    position: fixed;
-                    bottom: 2rem;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: #2d2a24;
-                    color: white;
-                    padding: 0.8rem 1.5rem;
-                    border-radius: 50px;
-                    z-index: 3000;
-                    opacity: 0;
-                    transition: opacity 0.3s;
-                    pointer-events: none;
-                    font-family: 'Inter', sans-serif;
-                }
-                .toast.show {
-                    opacity: 1;
-                }
-            `;
-            document.head.appendChild(style);
-        }
     }
     
     toast.textContent = message;

@@ -59,20 +59,20 @@ if(empty($featured_products)) {
     }
 }
 
-// Special offers (these can stay hardcoded as they are promotional)
+// Special offers (using Font Awesome icons)
 $special_offers = [
     ['title' => 'Free Delivery', 'desc' => 'On all orders over $50', 'icon' => 'fa-truck', 'color' => '#c45c4a', 'bg' => '#fee'],
     ['title' => '10% Off', 'desc' => 'First order coupon: WELCOME10', 'icon' => 'fa-percent', 'color' => '#4caf50', 'bg' => '#e8f5e9'],
-    ['title' => 'Birthday Bonus', 'desc' => 'Get 15% off on your birthday month', 'icon' => 'fa-birthday-cake', 'color' => '#ff9800', 'bg' => '#fff3e0'],
+    ['title' => 'Birthday Bonus', 'desc' => 'Get 15% off on your birthday month', 'icon' => 'fa-cake-candles', 'color' => '#ff9800', 'bg' => '#fff3e0'],
     ['title' => 'Refer a Friend', 'desc' => 'Earn $10 credit per referral', 'icon' => 'fa-users', 'color' => '#2196f3', 'bg' => '#e3f2fd'],
     ['title' => 'Free Vase', 'desc' => 'Free crystal vase with $75+ order', 'icon' => 'fa-gem', 'color' => '#9c27b0', 'bg' => '#f3e5f5'],
     ['title' => 'Weekly Special', 'desc' => 'Buy 2 get 1 free on bouquets', 'icon' => 'fa-gift', 'color' => '#e91e63', 'bg' => '#fce4ec'],
 ];
 
-// Featured categories
+// Featured categories (using Font Awesome icons)
 $featured_categories = [
     ['name' => 'Romantic Roses', 'icon' => 'fa-heart', 'color' => '#e91e63'],
-    ['name' => 'Birthday Blooms', 'icon' => 'fa-birthday-cake', 'color' => '#ff9800'],
+    ['name' => 'Birthday Blooms', 'icon' => 'fa-cake-candles', 'color' => '#ff9800'],
     ['name' => 'Anniversary', 'icon' => 'fa-ring', 'color' => '#c45c4a'],
     ['name' => 'Get Well Soon', 'icon' => 'fa-heartbeat', 'color' => '#4caf50'],
 ];
@@ -92,7 +92,9 @@ include 'header.php';
     }
 
     .welcome-banner::before {
-        content: '🌸🌺🌷🌹';
+        content: '\f50b \f33e \f335 \f579';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
         position: absolute;
         font-size: 180px;
         opacity: 0.08;
@@ -107,6 +109,10 @@ include 'header.php';
         margin-bottom: 0.5rem;
     }
 
+    .welcome-content h1 .welcome-icon {
+        margin-right: 0.5rem;
+    }
+
     .welcome-content p {
         opacity: 0.95;
         font-size: 1.1rem;
@@ -116,6 +122,10 @@ include 'header.php';
         opacity: 0.85;
         font-size: 0.9rem;
         margin-top: 0.5rem;
+    }
+
+    .member-since i {
+        margin-right: 0.3rem;
     }
 
     .categories-section {
@@ -146,10 +156,15 @@ include 'header.php';
         color: white;
     }
 
-    .category-card i {
+    .category-card:hover .category-icon {
+        color: white !important;
+    }
+
+    .category-card .category-icon {
         font-size: 2rem;
         margin-bottom: 0.5rem;
         display: block;
+        transition: color 0.3s;
     }
 
     .category-card h4 {
@@ -168,6 +183,11 @@ include 'header.php';
         margin-bottom: 2rem;
         color: #3d2a1f;
         position: relative;
+    }
+
+    .section-title .title-icon {
+        margin-right: 0.5rem;
+        color: #c45c4a;
     }
 
     .section-title:after {
@@ -309,6 +329,10 @@ include 'header.php';
         backdrop-filter: blur(4px);
     }
 
+    .product-rating i {
+        color: #ffc107;
+    }
+
     /* Discount badge - Right side */
     .discount-badge {
         position: absolute;
@@ -428,6 +452,23 @@ include 'header.php';
         transform: translateY(-2px);
     }
 
+    .view-all-link i {
+        margin-left: 0.3rem;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        grid-column: 1/-1;
+    }
+
+    .no-results i {
+        font-size: 3rem;
+        color: #ccc;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
     @media (max-width: 768px) {
         .welcome-content h1 {
             font-size: 1.5rem;
@@ -460,8 +501,8 @@ include 'header.php';
 
 <div class="welcome-banner">
     <div class="welcome-content">
-        <h1>Welcome back, <?php echo htmlspecialchars($user_data['first_name']); ?>! 🌸</h1>
-        <p>Discover hand-picked blooms, exclusive offers, and nature's finest creations.</p>
+        <h1><i class="fas fa-hand-peace welcome-icon"></i> Welcome back, <?php echo htmlspecialchars($user_data['first_name']); ?>!</h1>
+        <p><i class="fas fa-seedling" style="margin-right: 0.5rem;"></i>Discover hand-picked blooms, exclusive offers, and nature's finest creations.</p>
         <p class="member-since"><i class="fas fa-calendar-alt"></i> Member since <?php echo date('F Y', strtotime($user_data['created_at'])); ?></p>
     </div>
 </div>
@@ -470,7 +511,7 @@ include 'header.php';
     <div class="categories-grid">
         <?php foreach($featured_categories as $category): ?>
         <div class="category-card" onclick="window.location.href='shop.php'">
-            <i class="fas <?php echo $category['icon']; ?>" style="color: <?php echo $category['color']; ?>"></i>
+            <i class="fas <?php echo $category['icon']; ?> category-icon" style="color: <?php echo $category['color']; ?>"></i>
             <h4><?php echo $category['name']; ?></h4>
         </div>
         <?php endforeach; ?>
@@ -478,7 +519,7 @@ include 'header.php';
 </div>
 
 <div class="offers-section">
-    <h2 class="section-title">🎁 Special Offers Just for You</h2>
+    <h2 class="section-title"><i class="fas fa-gift title-icon"></i>Special Offers Just for You</h2>
     <div class="offers-grid">
         <?php foreach($special_offers as $offer): ?>
         <div class="offer-card">
@@ -493,13 +534,13 @@ include 'header.php';
 </div>
 
 <div class="featured-section">
-    <h2 class="section-title">✨ Featured Arrangements</h2>
+    <h2 class="section-title"><i class="fas fa-star title-icon"></i>Featured Arrangements</h2>
     <div class="products-grid">
         <?php if(empty($featured_products)): ?>
-            <div class="no-results" style="text-align: center; padding: 3rem; grid-column: 1/-1;">
-                <i class="fas fa-box-open" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem; display: block;"></i>
+            <div class="no-results">
+                <i class="fas fa-box-open"></i>
                 <p>No featured products available yet.</p>
-                <a href="shop.php" class="view-all-link" style="margin-top: 1rem; display: inline-block;">Browse All Products →</a>
+                <a href="shop.php" class="view-all-link" style="margin-top: 1rem; display: inline-block;">Browse All Products <i class="fas fa-arrow-right"></i></a>
             </div>
         <?php else: ?>
             <?php foreach($featured_products as $product): 
@@ -516,7 +557,7 @@ include 'header.php';
                 // Build left badges HTML
                 $leftBadgesHtml = '';
                 if($product['stock'] < 5 && $product['stock'] > 0) {
-                    $leftBadgesHtml .= '<div class="product-badge">🔥 Almost Gone</div>';
+                    $leftBadgesHtml .= '<div class="product-badge"><i class="fas fa-fire"></i> Almost Gone</div>';
                 }
                 $leftBadgesHtml .= '<div class="product-rating"><i class="fas fa-star"></i> ' . number_format($ratingValue, 1) . ' (' . $reviewCount . ')</div>';
             ?>
@@ -531,7 +572,7 @@ include 'header.php';
                     
                     <!-- Right side badge (Discount) -->
                     <?php if($discountPercent > 0): ?>
-                    <div class="discount-badge">-<?php echo $discountPercent; ?>% OFF</div>
+                    <div class="discount-badge"><i class="fas fa-tag"></i> -<?php echo $discountPercent; ?>%</div>
                     <?php endif; ?>
                     
                     <div class="product-info">
@@ -548,7 +589,13 @@ include 'header.php';
                             </div>
                         </div>
                         <div class="stock <?php echo $product['stock'] > 10 ? 'in-stock' : ($product['stock'] > 0 ? 'low-stock' : ''); ?>">
-                            <?php echo $product['stock'] > 10 ? '✓ In Stock' : ($product['stock'] > 0 ? "⚠️ Only {$product['stock']} left" : '❌ Out of Stock'); ?>
+                            <?php if($product['stock'] > 10): ?>
+                                <i class="fas fa-check-circle"></i> In Stock
+                            <?php elseif($product['stock'] > 0): ?>
+                                <i class="fas fa-exclamation-triangle"></i> Only <?php echo $product['stock']; ?> left
+                            <?php else: ?>
+                                <i class="fas fa-times-circle"></i> Out of Stock
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -557,7 +604,7 @@ include 'header.php';
         <?php endif; ?>
     </div>
     <div class="view-all">
-        <a href="shop.php" class="view-all-link">Browse All Flowers 🌸</a>
+        <a href="shop.php" class="view-all-link">Browse All Flowers <i class="fas fa-seedling"></i></a>
     </div>
 </div>
 

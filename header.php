@@ -4,8 +4,21 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Get cart count from session or localStorage (via JavaScript)
-// PHP cart count can be added later when implementing database cart
+// Get cart count from database if user is logged in
+$cart_count = 0;
+if(isset($_SESSION['user_id'])) {
+    // Database connection needed
+    require_once 'config/database.php';
+    
+    $count_sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM cart WHERE user_id = ?";
+    $count_stmt = $conn->prepare($count_sql);
+    $count_stmt->bind_param("i", $_SESSION['user_id']);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
+    $count_row = $count_result->fetch_assoc();
+    $cart_count = $count_row['total'] ?? 0;
+    $count_stmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -52,6 +65,10 @@ if (session_status() === PHP_SESSION_NONE) {
             -webkit-background-clip: text;
             color: transparent;
             text-decoration: none;
+        }
+
+        .logo i {
+            display: none;
         }
 
         .nav-links {
@@ -187,6 +204,7 @@ if (session_status() === PHP_SESSION_NONE) {
             border-radius: 50%;
             min-width: 20px;
             text-align: center;
+            font-weight: 600;
         }
 
         .logout-btn {
@@ -328,7 +346,9 @@ if (session_status() === PHP_SESSION_NONE) {
 <body>
 
 <nav class="navbar">
-    <a href="dashboard.php" class="logo">🌺 Ray & Roses</a>
+    <a href="dashboard.php" class="logo">
+        <i class="fas fa-seedling"></i> Ray & Roses
+    </a>
     <div class="nav-links">
         <a href="dashboard.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
             <i class="fas fa-home"></i> Home
@@ -361,7 +381,7 @@ if (session_status() === PHP_SESSION_NONE) {
         
         <a href="cart.php" class="cart-link <?php echo basename($_SERVER['PHP_SELF']) == 'cart.php' ? 'active' : ''; ?>">
             <i class="fas fa-shopping-bag"></i> Cart 
-            <span class="cart-count" id="cartCount">0</span>
+            <span class="cart-count" id="cartCount"><?php echo $cart_count; ?></span>
         </a>
         
         <?php if(isset($_SESSION['user_id'])): ?>
@@ -381,30 +401,29 @@ if (session_status() === PHP_SESSION_NONE) {
 </nav>
 
 <script>
-// Get cart count from localStorage
-function updateCartCount() {
-    const cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const cartCountElements = document.querySelectorAll('.cart-count');
-    cartCountElements.forEach(el => {
-        el.textContent = totalItems;
-    });
+// Function to fetch and update cart count from database
+function updateCartCountFromDatabase() {
+    <?php if(isset($_SESSION['user_id'])): ?>
+    fetch('get_cart_count.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const cartCountElements = document.querySelectorAll('.cart-count');
+                cartCountElements.forEach(el => {
+                    el.textContent = data.count;
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching cart count:', error));
+    <?php endif; ?>
 }
 
-// Update cart count when page loads and when cart changes
+// Update cart count when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    updateCartCount();
-    
-    // Listen for storage events (when cart changes in another tab)
-    window.addEventListener('storage', function(e) {
-        if (e.key === 'flowerCart') {
-            updateCartCount();
-        }
-    });
+    // Initial count is already set by PHP
+    // But we'll update it via AJAX to ensure it's current
+    updateCartCountFromDatabase();
 });
-
-// Custom event for cart updates (can be called from other pages)
-window.updateCartCountGlobal = updateCartCount;
 
 // For touch devices - click to toggle dropdown
 const dropdownBtn = document.getElementById('dropdownBtn');

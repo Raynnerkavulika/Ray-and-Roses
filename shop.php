@@ -7,6 +7,80 @@ require_once 'config/check_auth.php'; // Ensure user is logged in
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'];
 
+// Handle AJAX requests for cart operations
+if(isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    $response = ['success' => false, 'message' => 'Invalid action'];
+    
+    switch($_POST['action']) {
+        case 'add':
+            $product_id = intval($_POST['product_id']);
+            $quantity = intval($_POST['quantity'] ?? 1);
+            
+            // Check if product exists
+            $check_sql = "SELECT id, price, stock FROM products WHERE id = ? AND status = 'active'";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("i", $product_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if($check_result->num_rows > 0) {
+                $product = $check_result->fetch_assoc();
+                
+                // Check if item already in cart
+                $check_cart_sql = "SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?";
+                $check_cart_stmt = $conn->prepare($check_cart_sql);
+                $check_cart_stmt->bind_param("ii", $user_id, $product_id);
+                $check_cart_stmt->execute();
+                $check_cart_result = $check_cart_stmt->get_result();
+                
+                if($check_cart_result->num_rows > 0) {
+                    // Update quantity
+                    $cart_item = $check_cart_result->fetch_assoc();
+                    $new_quantity = $cart_item['quantity'] + $quantity;
+                    
+                    $update_sql = "UPDATE cart SET quantity = ? WHERE id = ?";
+                    $update_stmt = $conn->prepare($update_sql);
+                    $update_stmt->bind_param("ii", $new_quantity, $cart_item['id']);
+                    
+                    if($update_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Cart updated successfully'];
+                    }
+                    $update_stmt->close();
+                } else {
+                    // Add new item
+                    $insert_sql = "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)";
+                    $insert_stmt = $conn->prepare($insert_sql);
+                    $insert_stmt->bind_param("iii", $user_id, $product_id, $quantity);
+                    
+                    if($insert_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Product added to cart'];
+                    }
+                    $insert_stmt->close();
+                }
+                $check_cart_stmt->close();
+            }
+            $check_stmt->close();
+            break;
+            
+        case 'get_count':
+            $count_sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM cart WHERE user_id = ?";
+            $count_stmt = $conn->prepare($count_sql);
+            $count_stmt->bind_param("i", $user_id);
+            $count_stmt->execute();
+            $count_result = $count_stmt->get_result();
+            $count_row = $count_result->fetch_assoc();
+            $cart_count = $count_row['total'] ?? 0;
+            $count_stmt->close();
+            
+            $response = ['success' => true, 'count' => $cart_count];
+            break;
+    }
+    
+    echo json_encode($response);
+    exit();
+}
+
 // Fetch products from database with review counts and average ratings
 $products_sql = "SELECT p.*, 
                 COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -28,6 +102,20 @@ if($products_result && $products_result->num_rows > 0) {
 if(empty($products)) {
     $products = [];
 }
+
+// Get cart count for current user
+$cart_count = 0;
+$count_sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM cart WHERE user_id = ?";
+$count_stmt = $conn->prepare($count_sql);
+$count_stmt->bind_param("i", $user_id);
+$count_stmt->execute();
+$count_result = $count_stmt->get_result();
+$count_row = $count_result->fetch_assoc();
+$cart_count = $count_row['total'] ?? 0;
+$count_stmt->close();
+
+// Store cart count in session for header
+$_SESSION['cart_count'] = $cart_count;
 
 // Include header
 include 'header.php';
@@ -196,6 +284,10 @@ include 'header.php';
         gap: 0.3rem;
         width: fit-content;
         backdrop-filter: blur(4px);
+    }
+
+    .product-rating i {
+        color: #ffc107;
     }
 
     /* Discount badge - Right side */
@@ -592,11 +684,11 @@ include 'header.php';
 <div id="toast" class="toast"></div>
 
 <script>
-// Product data from PHP (fetched from database with review data)
+// Product data from PHP
 const productsData = <?php echo json_encode(array_values($products)); ?>;
 
-// Cart management
-let cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
+// Cart management - using AJAX to database
+let cart = [];
 
 // DOM Elements
 let currentFilter = 'all';
@@ -609,51 +701,67 @@ function getDiscountPercentage(originalPrice, currentPrice) {
     return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
 }
 
-// Function to get display rating (round to 1 decimal)
-function getDisplayRating(rating) {
-    if (!rating || rating == 0) return 'New';
-    return rating.toFixed(1);
+// Fetch cart from database
+function fetchCart() {
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'get_count' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateCartCountDisplay(data.count);
+        }
+    })
+    .catch(error => console.error('Error fetching cart:', error));
 }
 
-// Function to get star display (for product card - just show number)
-function getRatingNumber(rating) {
-    if (!rating || rating == 0) return '0.0';
-    return rating.toFixed(1);
-}
-
-// Save cart to localStorage
-function saveCart() {
-    localStorage.setItem('flowerCart', JSON.stringify(cart));
-    updateCartUI();
-    updateCartCount();
-}
-
-// Update cart count badge
-function updateCartCount() {
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+// Update cart count display
+function updateCartCountDisplay(count) {
     const cartCountElements = document.querySelectorAll('.cart-count');
     cartCountElements.forEach(el => {
-        if (el) el.textContent = totalItems;
+        if (el) el.textContent = count;
     });
 }
 
-// Add to cart
+// Add to cart - using database
 function addToCart(product) {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) {
-        existing.quantity++;
-    } else {
-        cart.push({
-            id: product.id,
-            name: product.name,
-            price: parseFloat(product.price),
-            quantity: 1,
-            image: product.image
-        });
+    const btn = document.querySelector(`.add-to-cart[data-product-id="${product.id}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
     }
-    saveCart();
-    showToast(`${product.name} added to cart! ✨`);
-    openCart();
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'add',
+            product_id: product.id,
+            quantity: 1
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`${product.name} added to cart! ✨`);
+            fetchCart(); // Update cart count
+            openCart();
+        } else {
+            showToast(data.message || 'Error adding to cart');
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to cart');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-shopping-cart"></i> Add to Cart';
+        }
+    });
 }
 
 // Add to wishlist
@@ -661,64 +769,22 @@ function addToWishlist(productId) {
     window.location.href = `wishlist.php?add=${productId}`;
 }
 
-// Update cart item quantity
+// Update cart item quantity (for sidebar)
 function updateQuantity(productId, delta) {
-    const index = cart.findIndex(item => item.id === productId);
-    if (index !== -1) {
-        const newQty = cart[index].quantity + delta;
-        if (newQty <= 0) {
-            cart.splice(index, 1);
-        } else {
-            cart[index].quantity = newQty;
-        }
-        saveCart();
-        showToast('Cart updated');
-    }
+    // This would need additional AJAX for updating quantities
+    // For now, redirect to cart page
+    window.location.href = 'cart.php';
 }
 
-// Remove from cart
+// Remove from cart (for sidebar)
 function removeFromCart(productId) {
-    cart = cart.filter(item => item.id !== productId);
-    saveCart();
-    showToast('Item removed from cart');
+    window.location.href = 'cart.php?remove=' + productId;
 }
 
 // Update cart UI
 function updateCartUI() {
-    const cartItemsDiv = document.getElementById('cartItems');
-    const cartTotalSpan = document.getElementById('cartTotal');
-    
-    if (cart.length === 0) {
-        cartItemsDiv.innerHTML = '<div class="empty-cart">🌸 Your cart is empty</div>';
-        cartTotalSpan.textContent = '$0.00';
-        return;
-    }
-    
-    let html = '';
-    let total = 0;
-    
-    cart.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        total += itemTotal;
-        html += `
-            <div class="cart-item">
-                <div class="cart-item-info">
-                    <h4>${escapeHtml(item.name)}</h4>
-                    <div class="cart-item-price">$${item.price.toFixed(2)}</div>
-                </div>
-                <div class="cart-item-controls">
-                    <button onclick="updateQuantity(${item.id}, -1)">-</button>
-                    <span>${item.quantity}</span>
-                    <button onclick="updateQuantity(${item.id}, 1)">+</button>
-                    <button onclick="removeFromCart(${item.id})" style="background: #fee; color: #c45c4a;">🗑️</button>
-                </div>
-            </div>
-        `;
-    });
-    
-    cartItemsDiv.innerHTML = html;
-    cartTotalSpan.textContent = `$${total.toFixed(2)}`;
-    updateCartCount();
+    // Since we're using database, we'll fetch cart items from database
+    fetchCart();
 }
 
 // Show toast notification
@@ -795,25 +861,28 @@ function renderProducts(products) {
         const reviewCount = parseInt(product.review_count) || 0;
         const ratingDisplay = rating > 0 ? rating.toFixed(1) : '0.0';
         
-        // Build left badges HTML (product badge and rating)
+        // Build left badges HTML
         let leftBadgesHtml = '';
         if (product.stock < 5 && product.stock > 0) {
-            leftBadgesHtml += '<div class="product-badge">🔥 Almost Gone</div>';
+            leftBadgesHtml += '<div class="product-badge"><i class="fas fa-fire"></i> Almost Gone</div>';
         }
         leftBadgesHtml += `<div class="product-rating"><i class="fas fa-star"></i> ${ratingDisplay} (${reviewCount})</div>`;
+        
+        // Escape product data for JSON
+        const productJSON = JSON.stringify(product).replace(/"/g, '&quot;');
         
         html += `
             <a href="product_details.php?id=${product.id}" class="product-card-link">
                 <div class="product-card" data-id="${product.id}">
                     <div class="product-img" style="background-image: url('${product.image}'); background-size: cover; background-position: center;"></div>
                     
-                    <!-- Left side badges (Product Badge + Rating) -->
+                    <!-- Left side badges -->
                     <div class="badge-left">
                         ${leftBadgesHtml}
                     </div>
                     
                     <!-- Right side badge (Discount) -->
-                    ${discountPercent ? `<div class="discount-badge">-${discountPercent}% OFF</div>` : ''}
+                    ${discountPercent ? `<div class="discount-badge"><i class="fas fa-tag"></i> -${discountPercent}%</div>` : ''}
                     
                     <div class="product-info">
                         <h3 class="product-title">${escapeHtml(product.name)}</h3>
@@ -830,7 +899,7 @@ function renderProducts(products) {
                             <span class="stock ${stockStatus}">${stockText}</span>
                         </div>
                         <div class="button-group" onclick="event.stopPropagation()">
-                            <button class="add-to-cart" onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})" ${disabled}>
+                            <button class="add-to-cart" data-product-id="${product.id}" onclick="addToCart(${productJSON})" ${disabled}>
                                 <i class="fas fa-shopping-cart"></i> ${disabled ? 'Out of Stock' : 'Add to Cart'}
                             </button>
                             <button class="add-to-wishlist" onclick="addToWishlist(${product.id})">
@@ -857,7 +926,8 @@ function escapeHtml(str) {
 // Cart drawer controls
 function openCart() {
     document.getElementById('cartOverlay').classList.add('open');
-    updateCartUI();
+    // Load cart items from database
+    window.location.href = 'cart.php';
 }
 
 function closeCart() {
@@ -866,21 +936,10 @@ function closeCart() {
 
 // Checkout
 function checkout() {
-    if (cart.length === 0) {
-        showToast('Your cart is empty! Add some beautiful flowers first 🌸');
-        return;
-    }
-    showToast('Proceeding to checkout... 🎉');
-    setTimeout(() => {
-        window.location.href = 'checkout.php';
-    }, 500);
+    window.location.href = 'checkout.php';
 }
 
 // Event listeners
-const cartIcon = document.getElementById('cartIcon');
-if (cartIcon) {
-    cartIcon.addEventListener('click', openCart);
-}
 document.getElementById('closeCartBtn')?.addEventListener('click', closeCart);
 document.getElementById('checkoutBtn')?.addEventListener('click', checkout);
 
@@ -915,15 +974,15 @@ document.getElementById('cartOverlay')?.addEventListener('click', (e) => {
 
 // Initialize
 filterAndSortProducts();
-updateCartCount();
+fetchCart();
 
-// Cart count badge shows items from localStorage
+// Update cart count when page loads
 window.addEventListener('load', () => {
-    updateCartUI();
+    fetchCart();
 });
 
 // Update cart count globally when called from other pages
-window.updateCartCountGlobal = updateCartCount;
+window.updateCartCountGlobal = fetchCart;
 </script>
 
 <?php include 'footer.php'; ?>

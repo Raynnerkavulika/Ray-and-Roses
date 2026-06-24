@@ -7,6 +7,149 @@ require_once 'config/check_auth.php'; // Ensure user is logged in
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'];
 
+// Initialize cart from database
+$cart_items = [];
+$cart_total = 0;
+$cart_count = 0;
+
+// Fetch cart items from database
+$cart_sql = "SELECT c.id as cart_id, c.product_id, c.quantity, p.id, p.name, p.price, p.image 
+             FROM cart c 
+             JOIN products p ON c.product_id = p.id 
+             WHERE c.user_id = ?";
+$cart_stmt = $conn->prepare($cart_sql);
+$cart_stmt->bind_param("i", $user_id);
+$cart_stmt->execute();
+$cart_result = $cart_stmt->get_result();
+
+if($cart_result && $cart_result->num_rows > 0) {
+    while($row = $cart_result->fetch_assoc()) {
+        $cart_items[] = $row;
+        $cart_total += $row['price'] * $row['quantity'];
+        $cart_count += $row['quantity'];
+    }
+}
+$cart_stmt->close();
+
+// Store cart count in session for header display
+$_SESSION['cart_count'] = $cart_count;
+
+// Handle AJAX requests for cart operations
+if(isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    $response = ['success' => false, 'message' => 'Invalid action'];
+    
+    switch($_POST['action']) {
+        case 'add':
+            $product_id = intval($_POST['product_id']);
+            $quantity = intval($_POST['quantity'] ?? 1);
+            
+            // Check if product exists
+            $check_sql = "SELECT id, price FROM products WHERE id = ? AND status = 'active'";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("i", $product_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if($check_result->num_rows > 0) {
+                $product = $check_result->fetch_assoc();
+                
+                // Check if item already in cart
+                $check_cart_sql = "SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?";
+                $check_cart_stmt = $conn->prepare($check_cart_sql);
+                $check_cart_stmt->bind_param("ii", $user_id, $product_id);
+                $check_cart_stmt->execute();
+                $check_cart_result = $check_cart_stmt->get_result();
+                
+                if($check_cart_result->num_rows > 0) {
+                    // Update quantity
+                    $cart_item = $check_cart_result->fetch_assoc();
+                    $new_quantity = $cart_item['quantity'] + $quantity;
+                    
+                    $update_sql = "UPDATE cart SET quantity = ? WHERE id = ?";
+                    $update_stmt = $conn->prepare($update_sql);
+                    $update_stmt->bind_param("ii", $new_quantity, $cart_item['id']);
+                    
+                    if($update_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Cart updated successfully'];
+                    }
+                    $update_stmt->close();
+                } else {
+                    // Add new item
+                    $insert_sql = "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)";
+                    $insert_stmt = $conn->prepare($insert_sql);
+                    $insert_stmt->bind_param("iii", $user_id, $product_id, $quantity);
+                    
+                    if($insert_stmt->execute()) {
+                        $response = ['success' => true, 'message' => 'Product added to cart'];
+                    }
+                    $insert_stmt->close();
+                }
+                $check_cart_stmt->close();
+            }
+            $check_stmt->close();
+            break;
+            
+        case 'update':
+            $cart_id = intval($_POST['cart_id']);
+            $quantity = intval($_POST['quantity']);
+            
+            if($quantity <= 0) {
+                // Remove item if quantity is 0 or negative
+                $delete_sql = "DELETE FROM cart WHERE id = ? AND user_id = ?";
+                $delete_stmt = $conn->prepare($delete_sql);
+                $delete_stmt->bind_param("ii", $cart_id, $user_id);
+                if($delete_stmt->execute()) {
+                    $response = ['success' => true, 'message' => 'Item removed from cart'];
+                }
+                $delete_stmt->close();
+            } else {
+                $update_sql = "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?";
+                $update_stmt = $conn->prepare($update_sql);
+                $update_stmt->bind_param("iii", $quantity, $cart_id, $user_id);
+                if($update_stmt->execute()) {
+                    $response = ['success' => true, 'message' => 'Cart updated successfully'];
+                }
+                $update_stmt->close();
+            }
+            break;
+            
+        case 'remove':
+            $cart_id = intval($_POST['cart_id']);
+            $delete_sql = "DELETE FROM cart WHERE id = ? AND user_id = ?";
+            $delete_stmt = $conn->prepare($delete_sql);
+            $delete_stmt->bind_param("ii", $cart_id, $user_id);
+            if($delete_stmt->execute()) {
+                $response = ['success' => true, 'message' => 'Item removed from cart'];
+            }
+            $delete_stmt->close();
+            break;
+            
+        case 'clear':
+            $delete_sql = "DELETE FROM cart WHERE user_id = ?";
+            $delete_stmt = $conn->prepare($delete_sql);
+            $delete_stmt->bind_param("i", $user_id);
+            if($delete_stmt->execute()) {
+                $response = ['success' => true, 'message' => 'Cart cleared successfully'];
+            }
+            $delete_stmt->close();
+            break;
+    }
+    
+    // Update session cart count
+    $count_sql = "SELECT SUM(quantity) as total FROM cart WHERE user_id = ?";
+    $count_stmt = $conn->prepare($count_sql);
+    $count_stmt->bind_param("i", $user_id);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
+    $count_row = $count_result->fetch_assoc();
+    $_SESSION['cart_count'] = $count_row['total'] ?? 0;
+    $count_stmt->close();
+    
+    echo json_encode($response);
+    exit();
+}
+
 // Fetch recommended products from database
 $recommended_sql = "SELECT id, name, price, image FROM products WHERE status = 'active' ORDER BY RAND() LIMIT 4";
 $recommended_result = $conn->query($recommended_sql);
@@ -132,6 +275,7 @@ include 'header.php';
         cursor: pointer;
         font-size: 0.75rem;
         font-weight: bold;
+        transition: 0.3s;
     }
 
     .cart-item-quantity button:hover {
@@ -166,6 +310,7 @@ include 'header.php';
         align-items: center;
         justify-content: center;
         border-radius: 50%;
+        transition: 0.3s;
     }
 
     .cart-item-remove:hover {
@@ -243,6 +388,7 @@ include 'header.php';
         border-radius: 6px;
         cursor: pointer;
         font-size: 0.7rem;
+        transition: 0.3s;
     }
 
     .coupon-input button:hover {
@@ -272,7 +418,7 @@ include 'header.php';
         transform: translateY(-2px);
     }
 
-    /* Continue Shopping Button - Styled */
+    /* Continue Shopping Button */
     .continue-shopping {
         display: flex;
         align-items: center;
@@ -416,10 +562,31 @@ include 'header.php';
         align-items: center;
         justify-content: center;
         gap: 0.3rem;
+        transition: 0.3s;
     }
 
     .add-cart-recommend:hover {
         background: #c45c4a;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2d2a24;
+        color: white;
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        z-index: 3000;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        font-size: 0.8rem;
+    }
+
+    .toast.show {
+        opacity: 1;
     }
 
     @media (max-width: 700px) {
@@ -442,226 +609,193 @@ include 'header.php';
         <p>Review your items before checkout</p>
     </div>
 
-    <div id="cartContent"></div>
-</div>
-
-<script>
-const recommendedProducts = <?php echo json_encode($recommended_products); ?>;
-let cart = JSON.parse(localStorage.getItem('flowerCart')) || [];
-let appliedCoupon = null;
-let discount = 0;
-
-function saveCart() {
-    localStorage.setItem('flowerCart', JSON.stringify(cart));
-    renderCart();
-    updateCartCount();
-}
-
-function updateCartCount() {
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    document.querySelectorAll('.cart-count').forEach(el => {
-        if (el) el.textContent = totalItems;
-    });
-}
-
-function updateQuantity(productId, delta) {
-    const index = cart.findIndex(item => item.id == productId);
-    if (index !== -1) {
-        const newQty = cart[index].quantity + delta;
-        if (newQty <= 0) {
-            cart.splice(index, 1);
-        } else {
-            cart[index].quantity = newQty;
-        }
-        saveCart();
-        showToast('Cart updated');
-    }
-}
-
-function removeItem(productId) {
-    const idToRemove = parseInt(productId);
-    cart = cart.filter(item => item.id != idToRemove);
-    saveCart();
-    showToast('Item removed');
-}
-
-function applyCoupon() {
-    const code = document.getElementById('couponCode').value;
-    if (code === 'WELCOME10') {
-        discount = 10;
-        appliedCoupon = 'WELCOME10';
-        showToast('10% off applied!');
-    } else if (code === 'FLOWER20') {
-        discount = 20;
-        appliedCoupon = 'FLOWER20';
-        showToast('20% off applied!');
-    } else if (code === 'FREE50') {
-        if (getCartTotal() > 50) {
-            discount = 5;
-            appliedCoupon = 'FREE50';
-            showToast('$5 off applied!');
-        } else {
-            showToast('Min $50 required');
-        }
-    } else {
-        showToast('Invalid code');
-    }
-    renderCart();
-}
-
-function getCartSubtotal() {
-    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-}
-
-function getCartTotal() {
-    let total = getCartSubtotal();
-    if (appliedCoupon === 'WELCOME10') total = total * 0.9;
-    else if (appliedCoupon === 'FLOWER20') total = total * 0.8;
-    else if (appliedCoupon === 'FREE50') total = total - 5;
-    return total;
-}
-
-function getShipping() {
-    return getCartSubtotal() > 50 ? 0 : 5.99;
-}
-
-function showToast(msg) {
-    let toast = document.getElementById('toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'toast';
-        toast.className = 'toast';
-        document.body.appendChild(toast);
-    }
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
-}
-
-function renderCart() {
-    const container = document.getElementById('cartContent');
-    
-    if (cart.length === 0) {
-        container.innerHTML = `
-            <div class="empty-cart">
-                <i class="fas fa-shopping-bag"></i>
-                <h2>Your cart is empty</h2>
-                <p>Add some beautiful flowers to get started!</p>
-                <a href="shop.php" class="shop-now-btn"><i class="fas fa-store"></i> Shop Now</a>
-            </div>
-        `;
-        updateCartCount();
-        return;
-    }
-    
-    const subtotal = getCartSubtotal();
-    const shipping = getShipping();
-    const discountAmt = appliedCoupon ? (appliedCoupon === 'FREE50' ? 5 : subtotal * (discount / 100)) : 0;
-    const total = getCartTotal() + shipping;
-    
-    let itemsHtml = '';
-    cart.forEach(item => {
-        itemsHtml += `
-            <div class="cart-item">
-                <div class="cart-item-img" style="background-image: url('${item.image || 'https://via.placeholder.com/55'}');"></div>
-                <div class="cart-item-details">
-                    <h4>${escapeHtml(item.name)}</h4>
-                    <p>Fresh flowers</p>
-                </div>
-                <div class="cart-item-price">$${parseFloat(item.price).toFixed(2)}</div>
-                <div class="cart-item-quantity">
-                    <button onclick="updateQuantity(${item.id}, -1)">-</button>
-                    <span>${item.quantity}</span>
-                    <button onclick="updateQuantity(${item.id}, 1)">+</button>
-                </div>
-                <div class="cart-item-subtotal">$${(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
-                <button class="cart-item-remove" onclick="removeItem(${item.id})" title="Remove"><i class="fas fa-trash-alt"></i></button>
-            </div>
-        `;
-    });
-    
-    let html = `
+    <div id="cartContent">
+        <?php if(empty($cart_items)): ?>
+        <div class="empty-cart">
+            <i class="fas fa-shopping-bag"></i>
+            <h2>Your cart is empty</h2>
+            <p>Add some beautiful flowers to get started!</p>
+            <a href="shop.php" class="shop-now-btn"><i class="fas fa-store"></i> Shop Now</a>
+        </div>
+        <?php else: ?>
         <div class="cart-wrapper">
             <div class="cart-items-section">
-                ${itemsHtml}
+                <?php foreach($cart_items as $item): ?>
+                <div class="cart-item" data-cart-id="<?php echo $item['cart_id']; ?>">
+                    <div class="cart-item-img" style="background-image: url('<?php echo $item['image'] ?? 'https://via.placeholder.com/55'; ?>');"></div>
+                    <div class="cart-item-details">
+                        <h4><?php echo htmlspecialchars($item['name']); ?></h4>
+                        <p>Fresh flowers</p>
+                    </div>
+                    <div class="cart-item-price">$<?php echo number_format($item['price'], 2); ?></div>
+                    <div class="cart-item-quantity">
+                        <button onclick="updateQuantity(<?php echo $item['cart_id']; ?>, -1)">-</button>
+                        <span id="qty-<?php echo $item['cart_id']; ?>"><?php echo $item['quantity']; ?></span>
+                        <button onclick="updateQuantity(<?php echo $item['cart_id']; ?>, 1)">+</button>
+                    </div>
+                    <div class="cart-item-subtotal">$<?php echo number_format($item['price'] * $item['quantity'], 2); ?></div>
+                    <button class="cart-item-remove" onclick="removeItem(<?php echo $item['cart_id']; ?>)" title="Remove"><i class="fas fa-trash-alt"></i></button>
+                </div>
+                <?php endforeach; ?>
             </div>
             <div class="cart-summary">
                 <h3>Summary</h3>
-                <div class="summary-row"><span>Subtotal</span><span>$${subtotal.toFixed(2)}</span></div>
-                <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : '$' + shipping.toFixed(2)}</span></div>
-                ${appliedCoupon ? `<div class="summary-row discount"><span>Discount</span><span>-$${discountAmt.toFixed(2)}</span></div>` : ''}
+                <div class="summary-row"><span>Subtotal</span><span>$<?php echo number_format($cart_total, 2); ?></span></div>
+                <div class="summary-row"><span>Shipping</span><span><?php echo $cart_total > 50 ? 'Free' : '$5.99'; ?></span></div>
                 <div class="coupon-section">
                     <div class="coupon-input">
                         <input type="text" id="couponCode" placeholder="Coupon code">
                         <button onclick="applyCoupon()">Apply</button>
                     </div>
                 </div>
-                <div class="summary-row total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
+                <div class="summary-row total"><span>Total</span><span>$<?php echo number_format($cart_total + ($cart_total > 50 ? 0 : 5.99), 2); ?></span></div>
                 <button class="checkout-btn" onclick="proceedToCheckout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <a href="shop.php" class="continue-shopping">
                     <i class="fas fa-arrow-left"></i> Continue Shopping
                 </a>
             </div>
         </div>
-    `;
-    
-    if (recommendedProducts.length > 0) {
-        html += `
-            <div class="recommended-section">
-                <h3 class="recommended-title">You May Also Like</h3>
-                <div class="recommended-grid">
-                    ${recommendedProducts.map(p => `
-                        <div class="recommended-card" onclick="addToCartById(${p.id})">
-                            <div class="recommended-img" style="background-image: url('${p.image}');"></div>
-                            <div class="recommended-info">
-                                <h4>${escapeHtml(p.name)}</h4>
-                                <div class="recommended-price">$${parseFloat(p.price).toFixed(2)}</div>
-                                <button class="add-cart-recommend" onclick="event.stopPropagation(); addToCartById(${p.id})">
-                                    <i class="fas fa-cart-plus"></i> Add
-                                </button>
-                            </div>
-                        </div>
-                    `).join('')}
+        <?php endif; ?>
+    </div>
+
+    <?php if(!empty($recommended_products)): ?>
+    <div class="recommended-section">
+        <h3 class="recommended-title">You May Also Like</h3>
+        <div class="recommended-grid">
+            <?php foreach($recommended_products as $product): ?>
+            <div class="recommended-card">
+                <div class="recommended-img" style="background-image: url('<?php echo $product['image']; ?>');"></div>
+                <div class="recommended-info">
+                    <h4><?php echo htmlspecialchars($product['name']); ?></h4>
+                    <div class="recommended-price">$<?php echo number_format($product['price'], 2); ?></div>
+                    <button class="add-cart-recommend" onclick="addToCart(<?php echo $product['id']; ?>)">
+                        <i class="fas fa-cart-plus"></i> Add
+                    </button>
                 </div>
             </div>
-        `;
-    }
-    
-    container.innerHTML = html;
-    updateCartCount();
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-function addToCartById(id) {
-    let product = recommendedProducts.find(p => p.id == id);
-    if (product) {
-        let existing = cart.find(item => item.id == product.id);
-        if (existing) existing.quantity++;
-        else cart.push({ id: product.id, name: product.name, price: parseFloat(product.price), quantity: 1, image: product.image });
-        saveCart();
-        showToast(`${product.name} added!`);
+function updateQuantity(cartId, delta) {
+    const qtySpan = document.getElementById('qty-' + cartId);
+    let newQty = parseInt(qtySpan.textContent) + delta;
+    
+    if (newQty < 1) {
+        if (confirm('Remove this item from cart?')) {
+            removeItem(cartId);
+        }
+        return;
+    }
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'update',
+            cart_id: cartId,
+            quantity: newQty
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            showToast(data.message || 'Error updating cart');
+        }
+    })
+    .catch(error => {
+        showToast('Error updating cart');
+    });
+}
+
+function removeItem(cartId) {
+    if (!confirm('Remove this item from cart?')) return;
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'remove',
+            cart_id: cartId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            showToast(data.message || 'Error removing item');
+        }
+    })
+    .catch(error => {
+        showToast('Error removing item');
+    });
+}
+
+function addToCart(productId) {
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'add',
+            product_id: productId,
+            quantity: 1
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message);
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast(data.message || 'Error adding to cart');
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to cart');
+    });
+}
+
+function applyCoupon() {
+    const code = document.getElementById('couponCode').value;
+    if (code === 'WELCOME10') {
+        showToast('10% off applied!');
+    } else if (code === 'FLOWER20') {
+        showToast('20% off applied!');
+    } else {
+        showToast('Invalid coupon code');
     }
 }
 
 function proceedToCheckout() {
-    if (cart.length === 0) { showToast('Cart is empty!'); return; }
+    <?php if(empty($cart_items)): ?>
+    showToast('Cart is empty!');
+    <?php else: ?>
     window.location.href = 'checkout.php';
+    <?php endif; ?>
 }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-window.removeItem = removeItem;
-renderCart();
-
-if (!document.querySelector('#toast-styles')) {
-    const style = document.createElement('style');
-    style.textContent = `.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#2d2a24;color:white;padding:0.6rem 1.2rem;border-radius:50px;z-index:3000;opacity:0;transition:opacity 0.3s;pointer-events:none;font-size:0.8rem}.toast.show{opacity:1}`;
-    document.head.appendChild(style);
-}
+// Update cart count in header
+document.addEventListener('DOMContentLoaded', function() {
+    const cartCount = <?php echo $cart_count; ?>;
+    document.querySelectorAll('.cart-count').forEach(el => {
+        el.textContent = cartCount;
+    });
+});
 </script>
 
 <?php include 'footer.php'; ?>
