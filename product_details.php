@@ -822,7 +822,7 @@ include 'header.php';
                 </button>
             </div>
             
-            <div class="product-price">$<?php echo number_format($product['price'], 2); ?></div>
+            <div class="product-price">KSh <?php echo number_format($product['price'], 2); ?></div>
             
             <div class="product-description">
                 <p><?php echo nl2br(htmlspecialchars($product['full_description'] ?: $product['description'])); ?></p>
@@ -873,7 +873,7 @@ include 'header.php';
             
             <!-- Delivery Info -->
             <div class="delivery-info">
-                <div class="info-item"><i class="fas fa-truck"></i><span>Free delivery on orders over $50</span></div>
+                <div class="info-item"><i class="fas fa-truck"></i><span>Free delivery on orders over KSh 50</span></div>
                 <div class="info-item"><i class="fas fa-shield-alt"></i><span>Freshness guaranteed for 7 days</span></div>
                 <div class="info-item"><i class="fas fa-undo-alt"></i><span>30-day return policy</span></div>
             </div>
@@ -967,9 +967,9 @@ include 'header.php';
         <div id="shipping-tab" class="tab-content">
             <h3>Shipping Information</h3>
             <ul style="margin-left: 1.5rem; color: #5a3f2c;">
-                <li><strong>Free Shipping:</strong> On all orders over $50</li>
-                <li><strong>Standard Shipping:</strong> $5.99 (3-5 business days)</li>
-                <li><strong>Express Shipping:</strong> $12.99 (1-2 business days)</li>
+                <li><strong>Free Shipping:</strong> On all orders over KSh 50</li>
+                <li><strong>Standard Shipping:</strong> KSh 5.99 (3-5 business days)</li>
+                <li><strong>Express Shipping:</strong> KSh 12.99 (1-2 business days)</li>
                 <li><strong>Same-Day Delivery:</strong> Available for orders placed before 2 PM</li>
             </ul>
             
@@ -993,7 +993,7 @@ include 'header.php';
                 <div class="related-img" style="background-image: url('<?php echo $rel['image']; ?>');"></div>
                 <div class="related-info">
                     <div class="related-name"><?php echo htmlspecialchars($rel['name']); ?></div>
-                    <div class="related-price">$<?php echo number_format($rel['price'], 2); ?></div>
+                    <div class="related-price">KSh <?php echo number_format($rel['price'], 2); ?></div>
                 </div>
             </a>
             <?php endforeach; ?>

@@ -379,7 +379,7 @@ include 'header.php';
             <p>Today, Ray & Roses is known for our handcrafted arrangements, exceptional customer service, and commitment to freshness. We partner with local farms to bring you the finest blooms while supporting sustainable agriculture.</p>
         </div>
         <div class="story-image">
-            <img src="https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&auto=format" alt="Our flower shop">
+            <img src="https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=600&auto=format" alt="Our flower shop">
         </div>
     </div>
 
@@ -437,7 +437,7 @@ include 'header.php';
         <h2 class="section-title">Meet Our Team</h2>
         <div class="team-grid">
             <div class="team-card">
-                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format');"></div>
+                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&auto=format');"></div>
                 <div class="team-info">
                     <h4>Raymond Mwangi</h4>
                     <p>Founder & Head Florist</p>
@@ -445,7 +445,7 @@ include 'header.php';
                 </div>
             </div>
             <div class="team-card">
-                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&auto=format');"></div>
+                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1590736704728-f47a5d8b0760?w=400&auto=format');"></div>
                 <div class="team-info">
                     <h4>Sarah Wanjiku</h4>
                     <p>Senior Florist</p>
@@ -453,7 +453,7 @@ include 'header.php';
                 </div>
             </div>
             <div class="team-card">
-                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format');"></div>
+                <div class="team-image" style="background-image: url('https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&auto=format');"></div>
                 <div class="team-info">
                     <h4>James Otieno</h4>
                     <p>Delivery Manager</p>

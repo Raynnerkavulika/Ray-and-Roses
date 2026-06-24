@@ -675,7 +675,7 @@ include 'header.php';
         </div>
         <div class="cart-total">
             <span>Total</span>
-            <span id="cartTotal">$0.00</span>
+            <span id="cartTotal">KSh 0.00</span>
         </div>
         <button class="checkout-btn" id="checkoutBtn">Proceed to Checkout →</button>
     </div>
@@ -890,10 +890,10 @@ function renderProducts(products) {
                         <div class="price-stock">
                             <div class="product-price-card">
                                 ${discountPercent ? `
-                                    <span class="original-price-card">$${displayOriginalPrice.toFixed(2)}</span>
-                                    <span class="discounted-price-card">$${displayPrice.toFixed(2)}</span>
+                                    <span class="original-price-card">KSh ${displayOriginalPrice.toFixed(2)}</span>
+                                    <span class="discounted-price-card">KSh ${displayPrice.toFixed(2)}</span>
                                 ` : `
-                                    <span class="price">$${displayPrice.toFixed(2)}</span>
+                                    <span class="price">KSh ${displayPrice.toFixed(2)}</span>
                                 `}
                             </div>
                             <span class="stock ${stockStatus}">${stockText}</span>

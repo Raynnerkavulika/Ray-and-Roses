@@ -627,28 +627,28 @@ include 'header.php';
                         <h4><?php echo htmlspecialchars($item['name']); ?></h4>
                         <p>Fresh flowers</p>
                     </div>
-                    <div class="cart-item-price">$<?php echo number_format($item['price'], 2); ?></div>
+                    <div class="cart-item-price">KSh <?php echo number_format($item['price'], 2); ?></div>
                     <div class="cart-item-quantity">
                         <button onclick="updateQuantity(<?php echo $item['cart_id']; ?>, -1)">-</button>
                         <span id="qty-<?php echo $item['cart_id']; ?>"><?php echo $item['quantity']; ?></span>
                         <button onclick="updateQuantity(<?php echo $item['cart_id']; ?>, 1)">+</button>
                     </div>
-                    <div class="cart-item-subtotal">$<?php echo number_format($item['price'] * $item['quantity'], 2); ?></div>
+                    <div class="cart-item-subtotal">KSh <?php echo number_format($item['price'] * $item['quantity'], 2); ?></div>
                     <button class="cart-item-remove" onclick="removeItem(<?php echo $item['cart_id']; ?>)" title="Remove"><i class="fas fa-trash-alt"></i></button>
                 </div>
                 <?php endforeach; ?>
             </div>
             <div class="cart-summary">
                 <h3>Summary</h3>
-                <div class="summary-row"><span>Subtotal</span><span>$<?php echo number_format($cart_total, 2); ?></span></div>
-                <div class="summary-row"><span>Shipping</span><span><?php echo $cart_total > 50 ? 'Free' : '$5.99'; ?></span></div>
+                <div class="summary-row"><span>Subtotal</span><span>KSh <?php echo number_format($cart_total, 2); ?></span></div>
+                <div class="summary-row"><span>Shipping</span><span><?php echo $cart_total > 50 ? 'Free' : 'KSh 5.99'; ?></span></div>
                 <div class="coupon-section">
                     <div class="coupon-input">
                         <input type="text" id="couponCode" placeholder="Coupon code">
                         <button onclick="applyCoupon()">Apply</button>
                     </div>
                 </div>
-                <div class="summary-row total"><span>Total</span><span>$<?php echo number_format($cart_total + ($cart_total > 50 ? 0 : 5.99), 2); ?></span></div>
+                <div class="summary-row total"><span>Total</span><span>KSh <?php echo number_format($cart_total + ($cart_total > 50 ? 0 : 5.99), 2); ?></span></div>
                 <button class="checkout-btn" onclick="proceedToCheckout()"><i class="fas fa-credit-card"></i> Checkout</button>
                 <a href="shop.php" class="continue-shopping">
                     <i class="fas fa-arrow-left"></i> Continue Shopping
@@ -667,7 +667,7 @@ include 'header.php';
                 <div class="recommended-img" style="background-image: url('<?php echo $product['image']; ?>');"></div>
                 <div class="recommended-info">
                     <h4><?php echo htmlspecialchars($product['name']); ?></h4>
-                    <div class="recommended-price">$<?php echo number_format($product['price'], 2); ?></div>
+                    <div class="recommended-price">KSh <?php echo number_format($product['price'], 2); ?></div>
                     <button class="add-cart-recommend" onclick="addToCart(<?php echo $product['id']; ?>)">
                         <i class="fas fa-cart-plus"></i> Add
                     </button>
